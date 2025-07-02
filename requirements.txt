@@ -1,2 +1,11 @@
 pandas
 boto3
+streamlit
+numpy
+scikit-learn
+matplotlib
+seaborn
+plotly
+imbalanced-learn
+sqlalchemy
+psycopg2-binary
