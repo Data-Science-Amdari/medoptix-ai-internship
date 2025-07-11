@@ -1,72 +1,33 @@
-# MedOptix AI – Personalized Treatment Optimization in European Healthcare
+# MedOptix ETL & ML Project
 
-**Amdari Internship Accelerator – June 2025**
-**Facilitator:** Muhammad Yekini
+This project contains ETL scripts, data analysis, and machine learning workflows for the MedOptix internship.
 
----
+## Structure
+- `src/` — Python scripts for ETL and data processing
+- `medoptix_data/` — Raw data files (CSV)
+- `models/` — Saved machine learning models
+- `reports/figures/` — Generated plots and figures
+- `medoptix_ETL.ipynb` — Main notebook for data analysis and modeling
 
-## 🔍 Overview
+## Setup
+1. Create and activate a Python virtual environment (recommended)
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the notebook or scripts as needed
 
-MedOptix is a UK-based digital health startup helping NHS and private orthopedic clinics improve patient outcomes. This full-stack data science project predicts therapy dropout, identifies adherence patterns, and powers personalized nudges for recovery.
+## Main Features
+- ETL pipeline for loading and cleaning data
+- Data exploration and visualization
+- Machine learning models for prediction and clustering
+- SHAP, Elbow, and Feature Importance plots
 
----
+## Usage
+- Update paths in scripts/notebooks as needed for your environment
+- Place raw data in `medoptix_data/`
+- Run `src/etl.py` for ETL tasks
+- Use `medoptix_ETL.ipynb` for analysis and modeling
 
-## 🚀 Objectives
-
-- Build an end-to-end pipeline: from CSV → PostgreSQL → Analysis → API
-- Segment patients into personas based on recovery behavior
-- Predict likelihood of dropout by Week 3
-- Visualize trends in therapy adherence across clinics
-
----
-
-## 📦 Project Structure
-
-```
-etl/          → Scripts to clean/load CSVs into PostgreSQL
-eda/          → Jupyter notebooks for exploratory analysis
-models/       → ML models: dropout prediction, adherence forecast
-api/          → FastAPI endpoints for predictions
-dashboards/   → Visual interfaces using Streamlit or Power BI
-```
-
----
-
-## 🧶 Tech Stack
-
-- **Languages**: Python, SQL
-- **Libraries**: Pandas, Seaborn, Plotly, scikit-learn, XGBoost, SHAP
-- **Database**: PostgreSQL (Aiven Cloud)
-- **Deployment**: Docker, Heroku/AWS EC2
-- **API**: FastAPI, Swagger
-- **CI/CD**: GitHub Actions
-- **Visualization**: Streamlit, Power BI
-
----
-
-## 📊 Current Progress
-
-| Phase            | Status         | Notes                           |
-| ---------------- | -------------- | ------------------------------- |
-| Data Engineering | ✅ Completed   | Tables created, ETL ready       |
-| EDA              | ⏳ In Progress | Pain trends & dropouts underway |
-| Modeling         | ⏳ Pending     | Starts June 22                  |
-| API + CI/CD      | ⏳ Pending     | After model training            |
-| Dashboard        | ⏳ Pending     | Streamlit or Power BI           |
-
----
-
-## 📚 Resources
-
-- [Project Brief PDF](docs/medoptix-brief.pdf)
-- [FastAPI Docs](https://fastapi.tiangolo.com)
-- [Healthcare ML Fairness](https://fairlearn.org)
-- [Streamlit Dashboards](https://streamlit.io)
-
----
-
-## 🤝 Contributions
-
-This project is part of the **Amdari Internship Accelerator**
-Mentor: Muhammad Yekini
-Intern Cohort: Jan–Jul 2025
+## Contact
+For questions, contact the project maintainer.
