@@ -1,2 +1,11 @@
 pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
 boto3
+python-dotenv
+psycopg2-binary
+imbalanced-learn
+joblib
+shap
