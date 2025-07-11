@@ -1,8 +1,6 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Environment files
+aiven.env
+aws.env
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
