@@ -1,3 +1,34 @@
+# MedOptix AI Project
+
+## Project Goal
+A machine learning pipeline for patient segmentation, dropout prediction, and adherence forecasting using session and patient data.
+
+## Data Sources
+- Raw CSVs: patient, session, and adherence data (in `data/raw/`)
+- Processed data: cleaned and feature-engineered datasets (in `data/processed/`)
+
+## Modeling Approach
+- ETL: Data cleaning, validation, and transformation
+- Feature Engineering: Aggregates, label creation, and reusable transformations
+- Segmentation: Clustering (K-Means, DBSCAN/HDBSCAN) and persona mapping
+- Dropout Prediction: Classification (e.g., XGBoost) with SHAP interpretation
+- Adherence Forecasting: Regression modeling and error analysis
+
+## Evaluation Metrics
+- Clustering: Silhouette score, cluster stability
+- Classification: ROC AUC, Precision, Recall, SHAP
+- Regression: MAPE, residual analysis
+
+## Next Steps
+- Expand feature engineering
+- Tune models and pipelines
+- Deploy best models
+- Automate reporting
+
+---
+
+See `notebooks/` for analysis, `src/` for scripts, and `tests/` for unit tests.
+
 # MedOptix AI – Personalized Treatment Optimization in European Healthcare
 
 **Amdari Internship Accelerator – June 2025**

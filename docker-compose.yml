@@ -1,41 +1,106 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  api:
-    build:
+  # Health check service for external PostgreSQL
+  postgres-check:
+    image: postgres:15-alpine
+    container_name: postgres_health_check
+    environment:
+      - PGHOST=${DB_HOST}
+      - PGPORT=${DB_PORT}
+      - PGDATABASE=${DB_NAME}
+      - PGUSER=${DB_USER}
+      - PGPASSWORD=${DB_PASSWORD}
+    command: >
+      sh -c "
+        echo 'Checking PostgreSQL connection...' &&
+        pg_isready -h $$PGHOST -p $$PGPORT -U $$PGUSER &&
+        echo 'PostgreSQL is ready!' &&
+        sleep infinity
+      "
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "${DB_HOST}", "-p", "${DB_PORT}", "-U", "${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - medoptix_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: medoptix_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - medoptix_network
+
+  app:
+    build: 
       context: .
       dockerfile: Dockerfile
-    container_name: medoptix-api
+    container_name: medoptix_ai
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     environment:
-      - PYTHONPATH=/app
-    volumes:
-      - ./models:/app/models
+      - PYTHONUNBUFFERED=1
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - db
+      postgres-check:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s  # Increased for model loading + DB connection
+    networks:
+      - medoptix_network
 
-  db:
-    image: postgres:16
-    container_name: medoptix-db
-    environment:
-      POSTGRES_USER: medoptix
-      POSTGRES_PASSWORD: medoptix_password
-      POSTGRES_DB: medoptix_db
+  nginx:
+    image: nginx:alpine
+    container_name: medoptix_nginx
     ports:
-      - "5432:5432"
+      - "8080:80"    # Using port 8080 to avoid Windows permission issues
+      - "8443:443"   # HTTPS port
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - medoptix_network
 
 volumes:
-  db_data:
+  redis_data:
+    driver: local
+
+networks:
+  medoptix_network:
+    driver: bridge

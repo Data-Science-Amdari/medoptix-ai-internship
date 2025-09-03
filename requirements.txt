@@ -1,11 +1,38 @@
+# FastAPI and web framework dependencies
 fastapi
 uvicorn[standard]
 gunicorn
 pydantic
+
+# CORS middleware
+python-multipart
+
+# Data science and ML libraries
 pandas
 numpy
-scikit-learn==1.6.1       # ← pin to the version used for training
+scikit-learn==1.4.2
 joblib
-shap
+imbalanced-learn
+
+# Database connectivity
 psycopg2-binary
+sqlalchemy
+
+# Redis connectivity
+redis
+
+# HTTP client for health checks
+httpx
+
+# Logging and monitoring
+python-json-logger
+
+# Environment variable management
 python-dotenv
+
+# Additional utilities
+typing-extensions
+
+# For development/testing 
+pytest
+pytest-asyncio
