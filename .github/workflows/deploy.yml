@@ -1,0 +1,231 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 300s
+          command_timeout: 30m
+          script: |
+            set -e
+            
+            echo "Starting deployment process..."
+            echo "Current user: $(whoami)"
+            echo "Working directory: $(pwd)"
+            
+            # Update system packages
+            sudo apt-get update -y
+            
+            # Install Docker if not already installed
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              
+              # Remove any old Docker packages
+              sudo apt-get remove -y docker docker-engine docker.io containerd runc || true
+              
+              # Install prerequisites
+              sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+              
+              # Add Docker's official GPG key
+              sudo mkdir -p /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              
+              # Set up the repository
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              
+              # Update package index and install Docker
+              sudo apt-get update -y
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              
+              # Start and enable Docker service
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              
+              # Add current user to docker group
+              sudo usermod -aG docker $USER
+              
+              echo "Docker installed successfully"
+            else
+              echo "Docker is already installed"
+              docker --version
+            fi
+            
+            # Install Docker Compose (standalone) if not available
+            if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+              echo "Installing Docker Compose..."
+              DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
+              sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              echo "Docker Compose installed successfully"
+            else
+              echo "Docker Compose is already available"
+              docker-compose --version 2>/dev/null || docker compose version
+            fi
+            
+            # Install other required tools
+            sudo apt-get install -y git curl net-tools
+            
+            # Create application directory
+            APP_DIR="/home/ubuntu/medoptix-api"
+            sudo mkdir -p $APP_DIR
+            sudo chown ubuntu:ubuntu $APP_DIR
+            cd $APP_DIR
+            
+            # Handle Git repository
+            if [ -d ".git" ]; then
+              echo "Updating existing repository..."
+              git fetch --all
+              git reset --hard origin/main
+              git pull origin main
+            else
+              echo "Cloning repository..."
+              git clone https://github.com/${{ github.repository }}.git .
+            fi
+            
+            # Set proper ownership
+            sudo chown -R ubuntu:ubuntu $APP_DIR
+            
+            # Create environment file from GitHub secrets
+            echo "Creating .env file from GitHub secrets..."
+            cat > .env << EOL
+            NODE_ENV=production
+            PORT=8000
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_SSLMODE=${{ secrets.DB_SSLMODE }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            EOL
+            
+            echo "✅ Environment file created from GitHub secrets"
+            
+            # Check if docker-compose.yml exists
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "❌ docker-compose.yml not found in repository"
+              echo "Available files:"
+              ls -la
+              exit 1
+            fi
+            
+            echo "Found docker-compose.yml, proceeding with deployment..."
+            
+            # Remove obsolete version attribute if it exists
+            if grep -q "^version:" docker-compose.yml; then
+              echo "Removing obsolete version attribute from docker-compose.yml..."
+              sed -i '/^version:/d' docker-compose.yml
+            fi
+            
+            # Stop and remove existing containers
+            echo "Stopping existing containers..."
+            sudo docker-compose down --remove-orphans 2>/dev/null || true
+            
+            # Force remove any conflicting containers by name
+            echo "Removing any conflicting containers..."
+            sudo docker rm -f medoptix_redis postgres_health_check medoptix_app medoptix_ai medoptix_nginx 2>/dev/null || true
+            
+            # Remove any dangling containers
+            echo "Cleaning up dangling containers..."
+            sudo docker container prune -f 2>/dev/null || true
+            
+            # Remove old images to free space
+            echo "Cleaning up old Docker images..."
+            sudo docker image prune -f 2>/dev/null || true
+            
+            # Build and start containers
+            echo "Building and starting containers..."
+            sudo docker-compose up -d --build --force-recreate
+            
+            # Show running containers
+            echo "Running containers:"
+            sudo docker-compose ps
+            
+            # Wait for services to be ready
+            echo "Waiting for services to start..."
+            sleep 45
+            
+            # Check if port 8000 is listening
+            echo "Checking if port 8000 is listening..."
+            if ! netstat -tuln | grep -q ":8000 "; then
+              echo "Port 8000 is not listening, checking container logs..."
+              sudo docker-compose logs --tail=100
+            fi
+            
+            # Health check with retry logic
+            echo "Performing health check..."
+            RETRY_COUNT=0
+            MAX_RETRIES=6
+            HEALTH_URL="http://localhost:8000/health"
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f -s --connect-timeout 10 --max-time 30 $HEALTH_URL > /dev/null 2>&1; then
+                echo "✅ Health check passed!"
+                echo "Service response:"
+                curl -s $HEALTH_URL || echo "Could not get response content"
+                break
+              else
+                echo "❌ Health check failed, retrying in 15 seconds... (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+                
+                # Show some debugging info
+                echo "Checking if service is running..."
+                sudo docker-compose ps
+                echo "Recent logs:"
+                sudo docker-compose logs --tail=20 --since=2m
+                
+                sleep 15
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+              fi
+            done
+            
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Health check failed after $MAX_RETRIES attempts"
+              echo "Final container status:"
+              sudo docker-compose ps
+              echo "Full container logs:"
+              sudo docker-compose logs --tail=100
+              echo "Docker system info:"
+              sudo docker system df
+              exit 1
+            fi
+            
+            # Clean up unused Docker resources
+            echo "Cleaning up unused Docker resources..."
+            sudo docker system prune -f 2>/dev/null || true
+            
+            # Get public IP for final message
+            PUBLIC_IP=$(curl -s --connect-timeout 10 ifconfig.me 2>/dev/null || curl -s --connect-timeout 10 ipinfo.io/ip 2>/dev/null || echo "Unable to determine public IP")
+            
+            echo "🎉 Deployment successful!"
+            echo "📍 Application should be accessible at: http://$PUBLIC_IP:8000"
+            echo "🔍 Health check endpoint: http://$PUBLIC_IP:8000/health"
+            
+            # Final status check
+            echo "Final container status:"
+            sudo docker-compose ps
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment completed successfully"
+          else
+            echo "❌ Deployment failed"
+            exit 1
+          fi
