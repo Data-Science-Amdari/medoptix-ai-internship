@@ -70,3 +70,19 @@ dashboards/   → Visual interfaces using Streamlit or Power BI
 This project is part of the **Amdari Internship Accelerator**
 Mentor: Muhammad Yekini
 Intern Cohort: Jan–Jul 2025
+
+---
+
+## 👤 Author (Submission Info)
+
+**Name:** Gideon Okomayin  
+**GitHub:** [github.com/GideonOkomayin](https://github.com/gideonkomayin)  
+**LinkedIn:** [linkedin.com/in/gideonokomayin](https://linkedin.com/in/gideonokomayin)  
+**Demo Video:** Coming Soon  
+
+**Personal Contributions:**  
+- Conducted exploratory data analysis (EDA) on therapy adherence and dropout patterns  
+- Contributed to model development for early dropout prediction  
+- Assisted with API testing and CI/CD integration  
+- Documented workflows and insights for team collaboration
+
