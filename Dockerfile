@@ -1,77 +1,41 @@
-# Builder stage
+# ---------- Build Stage ----------
 FROM python:3.11-slim AS builder
-
-# Set working directory
 WORKDIR /app
 
-# Set environment variables
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apt-get update && apt-get install -y build-essential
 
-# Copy requirements first for better caching
+# Copy and install dependencies
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python packages to default location
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Runtime stage
+# ---------- Runtime Stage ----------
 FROM python:3.11-slim
-
-# Set working directory
 WORKDIR /app
 
-# Set environment variables
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+    PYTHONDONTWRITEBYTECODE=1
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libpq5 \
-    curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder stage
+# Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Create non-root user
-RUN groupadd -r medoptix && useradd -r -g medoptix medoptix
-
-# Create necessary directories
-RUN mkdir -p /app/models/segmentation \
-    /app/models/dropout_prediction \
-    /app/models/adherence_forecasting \
-    /app/reports/figures/segmentation \
-    /app/reports/figures/dropout_prediction \
-    /app/reports/figures/adherence_forecasting \
-    /app/logs
 
 # Copy application code
 COPY . .
 
-# Set proper permissions
-RUN chown -R medoptix:medoptix /app
+# Create models directory structure
+RUN mkdir -p models/dropout_prediction models/segmentation models/adherence_forecasting
 
-# Switch to non-root user
-USER medoptix
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["python", "-m", "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "app.main:app", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-"]
+# Run the app using Gunicorn with Uvicorn workers
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "app.main:app", "--bind", "0.0.0.0:8000"]
