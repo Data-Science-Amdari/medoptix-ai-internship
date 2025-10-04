@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # checkout the code and deploy to EC2
+    ## checkout the code and deploy to EC2
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

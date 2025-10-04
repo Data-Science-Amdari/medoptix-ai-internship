@@ -53,3 +53,4 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/medoptix-app:ci-${{ github.sha }}
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/medoptix-app:latest
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/medoptix-app:latest,mode=max
+## Commits
