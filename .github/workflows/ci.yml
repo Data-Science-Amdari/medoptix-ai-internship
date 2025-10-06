@@ -42,7 +42,7 @@ jobs:
   build-and-push:
     needs: build-and-test
     runs-on: ubuntu-latest
-    # Only build on push to main branch, not on PRs
+    ## Only build on push to main branch, not on PRs
     if: github.event_name == 'push'
     steps:
       - name: Checkout code
