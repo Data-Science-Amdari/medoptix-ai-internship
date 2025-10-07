@@ -8,20 +8,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Only deploy after CI passes
-    needs: []
+    needs: build-and-push
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Wait for CI to complete
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'build-and-push'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-        if: github.event_name == 'push'
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -30,11 +21,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            set -e  # Exit on any error
-            
+            set -e
+
             echo "=== Starting deployment ==="
-            
-            # Install docker and docker-compose if not present
+
+            # Install Docker and Docker Compose if not present
             if ! command -v docker &> /dev/null; then
               echo "Installing Docker..."
               sudo apt-get update
@@ -43,12 +34,12 @@ jobs:
               sudo systemctl enable docker
               sudo usermod -aG docker $USER
             fi
-            
-            # Create directories if they do not exist
+
+            # Prepare application directory
             mkdir -p /home/ubuntu/medoptix-api
             cd /home/ubuntu/medoptix-api
-            
-            # Pull the latest code
+
+            # Pull latest code
             echo "=== Pulling latest code ==="
             if [ -d ".git" ]; then
               git fetch origin
@@ -57,28 +48,28 @@ jobs:
             else
               git clone -b medoptix_ai_project_ib https://github.com/${{ github.repository }}.git .
             fi
-            
-            # Pull the latest docker image
+
+            # Pull latest Docker image
             echo "=== Pulling Docker image ==="
             docker pull ${{ secrets.DOCKER_USERNAME }}/medoptix-api:latest
-            
-            # Stop existing containers gracefully
+
+            # Stop existing containers
             echo "=== Stopping existing containers ==="
             docker-compose down || true
-            
-            # Start the docker compose
+
+            # Start new containers
             echo "=== Starting new containers ==="
             docker-compose up -d --build
-            
+
             # Wait for service to be ready
             echo "=== Waiting for service to start ==="
             sleep 30
-            
+
             # Health check with retry
             echo "=== Running health check ==="
             MAX_RETRIES=5
             RETRY_COUNT=0
-            
+
             while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
               if curl -f http://localhost:8000/health; then
                 echo "Health check passed!"
@@ -96,19 +87,17 @@ jobs:
                 fi
               fi
             done
-            
-            # Cleanup old images
+
+            # Cleanup old Docker images
             echo "=== Cleaning up old Docker images ==="
             docker image prune -f
-            
+
             echo "=== Deployment successful! ==="
 
       - name: Deployment notification
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "Deployment completed successfully"
+            echo "✅ Deployment completed successfully"
           else
-            echo "Deployment failed"
-          fi
-
+            echo "❌ Deployment failed"
