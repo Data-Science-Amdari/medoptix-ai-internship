@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    ## Only deploy after CI passes
+    # Only deploy after CI passes
     needs: []
     steps:
       - name: Checkout code
